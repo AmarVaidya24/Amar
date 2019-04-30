@@ -1,0 +1,67 @@
+﻿[decimal]$cputhreshold = 80 
+$logfile = "Servers_CPU_Threshold_$(Get-Date -format "dd-MMM-yyyy-HH-mm").log"
+$ErrorActionPreference = "SilentlyContinue"
+$servers = Get-Content "C:\temp\serverlist.txt"
+$output_file ="C:\temp\TOPCPU.csv"
+
+
+function log($string, $color)
+{
+	
+	if ($color -eq $null) { $color = "white" }
+	
+	Write-Host $(Get-Date -format "dd-MMM-yyyy-HH-mm") $string -foregroundcolor $color
+	
+	$date = $(Get-Date -format "dd-MMM-yyyy HH:mm:ss")
+	
+	$string = $date + " " + $string
+	
+	$string | out-file -Filepath "C:\Temp\$logfile" -Append
+	
+}
+
+$obj= @()
+
+$alive = $true
+do {
+	$alive = $true
+	foreach ($server in $servers) {
+	
+		$wmi = Get-WmiObject -Class "Win32_OperatingSystem" -ComputerName $server
+			
+		if ($wmi -ne $null) 
+        {
+			Log "Checking Server:$server CPUthreshold > 80" 
+            $tableFragment = Get-WMIObject  -ComputerName $server win32_processor | select __Server, @{name="CPUUtilization" ;expression ={“{0:N2}” -f (get-counter -Counter "\Processor(_Total)\% Processor Time" -SampleInterval 1 -MaxSamples 5 | 
+                             select -ExpandProperty countersamples | select -ExpandProperty cookedvalue | Measure-Object -Average).average}}| Where-Object {[decimal]$_.CPUUtilization -gt [decimal]$cputhreshold} 
+
+             If($tableFragment)    
+             {
+              log "Checking Server TOP 5 Processes"
+              $TOP_fiveProcees = Get-Process -ComputerName $server | Sort-Object CPU -desc | Select-Object -first 10 | select CPU,ProcessName
+                            
+              $obj =New-Object psobject -Property @{
+              ComputerName= $($tableFragment.__SERVER) -join "`r`n"
+              CPUUtilization =$($tableFragment.CPUUtilization) -join "`r`n"
+              TOPProcess = @($($TOP_fiveProcees.ProcessName)) -join "`r`n"
+              }
+
+             write "$($tableFragment.__SERVER):$($tableFragment.CPUUtilization):$($TOP_fiveProcees.ProcessName)"
+              $obj | Export-Csv $output_file -NoTypeInformation -Append -Delimiter ";"
+                            
+             }
+             else
+             {Log "Server:$server CPUthreshold < 80"              }
+                         
+            $alive = $true
+		} 
+        else 
+        {
+			Log "$server : Offline" Red
+			$alive = $false
+		}
+	}
+if($obj){
+ log "Log File Created at $output_file"
+ }else{Log "Log file not created"}
+} while ($alive -eq $false)
