@@ -1,0 +1,63 @@
+Import-Module ActiveDirectory
+
+$logfile = "AD_Properties_OU_$(Get-Date -format "dd-MMM-yyyy-HH-mm").log"
+
+function log($string, $color)
+{
+	
+	if ($color -eq $null) { $color = "white" }
+	
+	Write-Host $(Get-Date -format "dd-MMM-yyyy-HH-mm") $string -foregroundcolor $color
+	
+	$date = $(Get-Date -format "dd-MMM-yyyy HH:mm:ss")
+	
+	$string = $date + " " + $string
+	
+	$string | out-file -Filepath "C:\Temp\$logfile" -append
+	
+} 
+
+$forest_name = (Get-ADDomainController -Discover).Domain
+
+$parts = $forest_name.split(".")
+
+foreach ($smallparts in $parts)
+{
+                             
+$value += ",DC=" + $smallparts
+                             
+}
+              
+$append = "OU=EMEA$value"
+
+
+
+$EMEA = (Get-ADOrganizationalUnit -Filter * -Searchbase $append -SearchScope OneLevel).name
+
+$EMEADC = $EMEA | foreach {Get-ADDomainController -Filter "name -like 'glt$_*'" | select -ExpandProperty name}
+
+Foreach ($DCname in $EMEADC)
+{
+    Log "Working on: $DCname"
+    $zones = Get-Content C:\temp\zonename.txt
+    
+    Foreach ($zone in $zones)
+    {
+
+        try
+        {
+            # Add-DnsServerSecondaryZone -Name $zone  -MasterServers 10.16.84.20,10.17.129.15,10.17.2.41 -ZoneFile "$zone.dns" -ComputerName $DCname -PassThru 
+            Remove-DnsServerZone -Name $zone -ComputerName $DCname -PassThru -Force
+            log "$zone is removed from $DCname" "Green"
+        }
+        catch
+        {
+
+            Log "Unable to remove $zone" "red"
+        }
+
+
+    }
+
+}
+Log "Log File Created at C:\Temp\$logfile"

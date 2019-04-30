@@ -1,0 +1,69 @@
+﻿$logfile = "AD_Properties_OU_$(Get-Date -format "dd-MMM-yyyy-HH-mm").log"
+$Category = "ApplicationOUv16"
+Import-Module ActiveDirectory
+
+function log($string, $color)
+{
+	
+	if ($color -eq $null) { $color = "white" }
+	
+	Write-Host $(Get-Date -format "dd-MMM-yyyy-HH-mm") $string -foregroundcolor $color
+	
+	$date = $(Get-Date -format "dd-MMM-yyyy HH:mm:ss")
+	
+	$string = $date + " " + $string
+	
+	$string | out-file -Filepath "C:\Test\$logfile" -append
+	
+}
+
+If (($args[0] -eq $null))
+{
+	Log "Argument is mandetory to Change properties. Example: C:\.\Set-AdProperties.ps1 /all " "Red"
+	
+}
+
+
+
+if (($args[0] -eq "/All") -or ($args[0] -eq "-All"))
+{
+	log "Value read from Command line"
+	$forest_name = (Get-ADDomainController -Discover).Domain
+	
+	log "Forest_name: $forest_name"
+	$parts = $forest_name.split(".")
+	
+	foreach ($smallparts in $parts)
+	{
+		
+		$value += ",DC=" + $smallparts
+		
+	}
+	
+	$append = "OU=Shared$value" #Stores OU=Shared,DC=main,DC=glb,DC=corp,DC=local
+	
+	log "Shared OU DistinguishedName $append"
+	
+	$SubOUs = Get-ADOrganizationalUnit -LDAPFilter '(name=*)' -SearchBase $append -SearchScope OneLevel | select Name, DistinguishedName
+	
+	
+	Foreach ($subou in $subous)
+	{
+		Log "Wokring on OU:$($subou.Name)"
+		$ObjectInstance = Get-ADObject -Identity $subou.DistinguishedName
+		$ObjectInstance.businessCategory = $Category
+		
+		Set-ADObject -Instance $ObjectInstance
+		Log "BusinessCategory $Category is Set for OU:$($subou.Name)" "Green"
+	}
+	log "BusinessCategory $Category is Set for ALL OU" "Green"
+	log "Logfile Created at C:\Test\$logfile"
+}
+
+
+
+
+
+
+
+

@@ -1,0 +1,63 @@
+Option Explicit
+'-------------------------------------------------------------------------------------------------------------------------
+'
+' Run Script
+'
+'-------------------------------------------------------------------------------------------------------------------------
+'
+' Script Template :
+'     2009-09-30 V1.0.0
+'     Julien TRUCHOT - EXAKIS
+'
+'-------------------------------------------------------------------------------------------------------------------------
+' Description : Define variable for user
+'
+' Revision History :
+' 2009-11-02 V01.01 : JTT - Creation
+'
+'
+
+On Error Resume Next
+
+Dim fso        : Set fso        = CreateObject("Scripting.FileSystemObject")
+Dim ficLibrary : Set ficLibrary = fso.OpenTextFile(replace(Wscript.ScriptFullName,Wscript.ScriptName,"") & "library.vbs")
+ExecuteGlobal ficLibrary.ReadAll
+
+datStartTime=Now
+
+Dim WshNetwork
+Dim strUserName
+Dim strWpadLocation, strLowWpadLocation, l_intRCode
+
+TraceEvent "Get current UserName", ""
+Set WshNetwork = WScript.CreateObject("WScript.Network")
+strUserName = WshNetwork.UserName
+
+If (strUserName <> "") and (strUserName <> null) Then
+	TraceEvent "Current UserName : " & strUserName, ""
+Else
+	TraceEvent "Error retrieving UserName", "error"
+End If
+
+TraceEvent "Build Wpad location in temporary internet files content", ""
+strWpadLocation = "C:\Users\" & strUserName & "\AppData\Local\Microsoft\Windows\Temporary Internet Files\Content.IE5"
+TraceEvent "Wpad location in temporary internet files content : " & strWpadLocation, ""
+TraceEvent "Remove all wpad files from temporary internet files content", ""
+l_intRCode = WshShell.Run("cmd /c DEL /S /Q " & chr(34) & strWpadLocation & "\*wpad*.dat" & chr(34),0,True)
+
+If (l_intRCode <> 0) Then
+	TraceEvent "Error removing wpad files from temporary internet files content", "error"
+End If
+
+l_intRCode = 0
+TraceEvent "Build Wpad location in temporary internet files low content", ""
+strLowWpadLocation = "C:\Users\" & strUserName & "\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5"
+TraceEvent "Wpad location in temporary internet files low content : " & strLowWpadLocation, ""
+TraceEvent "Remove all wpad files from temporary internet files low content", ""
+l_intRCode = WshShell.Run("cmd /c DEL /S /Q " & chr(34) & strLowWpadLocation & "\*wpad*.dat" & chr(34),0,True)
+
+If (l_intRCode <> 0) Then
+	TraceEvent "Error removing wpad files from temporary internet files low content", "error"
+End If
+ 
+EndLocalScript

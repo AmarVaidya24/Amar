@@ -1,0 +1,19 @@
+#------------------------------------Method 1---------------------------------------------------------------------
+
+$SubOUs=Get-ADOrganizationalUnit -LDAPFilter '(name=*)' -SearchBase 'OU=Shared,DC=mad,DC=glb,DC=local' -SearchScope OneLevel|select name,DistinguishedName
+
+
+Foreach($subou in $subous)
+{
+
+$ObjectInstance = Get-ADObject -Identity $subou.DistinguishedName
+$ObjectInstance.businessCategory ="ApplicationOUv20"
+Set-ADObject -Instance $ObjectInstance
+
+}
+
+#------------------------------------Mehod 2------------------------------------------------------------------
+
+Get-ADOrganizationalUnit -LDAPFilter '(name=*)' -SearchBase 'OU=Shared,DC=mad,DC=glb,DC=local' -SearchScope OneLevel | Set-ADObject -replace @{ businessCategory = "ApplicationOUv18" }
+
+#-------------------------------------------------------------------------------------------------------------

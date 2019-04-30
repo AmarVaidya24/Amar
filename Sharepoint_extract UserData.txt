@@ -1,0 +1,44 @@
+Add-PSSnapin Microsoft.SharePoint.PowerShell
+$site = Get-SPSite http://sporion.cloudapp.net
+
+
+
+if($Site -ne $null)
+{
+$SPWebCollection = $Site.AllWebs
+
+    foreach($SPWeb in $SPWebCollection)
+    {
+    
+
+
+        foreach($SPGroup in $SPWeb.Groups)
+        {
+        
+                Foreach($user in $SPGroup.Users)
+                {
+
+                
+                $role= ($SPGroup.Roles).Name
+                $Users_Role =(@($role) -join "`r`n")
+ 
+                New-Object -TypeName PSObject -Property @{
+                                Title=$SPWeb.Title
+                                GroupName = $SPGroup.Name
+                                UsersLogin = $User.UserLogin
+                                DisplayName=$User.DisplayName
+                                UserRole=$Users_Role
+                                } | Select-Object Title,GroupName,UsersLogin,DisplayName,UserRole| Export-Csv -Path "C:\Temp\export_new.csv" -append -NoTypeInformation
+
+
+                }
+
+        }
+
+    Write-Output "========================"
+    }
+}
+else
+{
+Write-Host "Requested Site Could Not be found" -ForegroundColor DarkRed
+}

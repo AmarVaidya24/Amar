@@ -1,0 +1,37 @@
+$servers = get-content C:\Test\Server.txt
+$output = 'C:\Test\test.csv'
+$results = @()
+
+foreach ($server in $servers)
+{
+	Try{
+	$admins = @()
+	$group = [ADSI]"WinNT://$server/Administrators" 
+	$members = @($group.psbase.Invoke("Members"))
+	$members | foreach {
+		$obj = new-object psobject -Property @{
+			Server    = $Server
+			Admin	  = $_.GetType().InvokeMember("Name", 'GetProperty', $null, $_, $null)
+			Status    = "OK"	
+		}
+		If ($obj.Admin -like "Domain*")
+		{
+			$admins += $obj
+		}
+	}
+		$results += $admins
+		
+	}
+	Catch
+	{
+		$obj = new-object psobject -Property @{
+			Server	   = "$Server"
+			Admin	   = "-"
+			Status	   = "KO"
+		}
+		
+		$results+= $obj
+		
+	}
+}
+$results | Export-csv $Output -NoTypeInformation

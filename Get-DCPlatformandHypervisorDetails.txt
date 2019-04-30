@@ -1,0 +1,126 @@
+Function Get-MachineType 
+{ 
+    [CmdletBinding()] 
+    #[OutputType([int])] 
+    Param 
+    ( 
+        
+        $Credential = [System.Management.Automation.PSCredential]::Empty 
+    ) 
+   # $Credential = [System.Management.Automation.PSCredential]::Empty
+    Begin 
+    { 
+    $getdomain = [System.Directoryservices.Activedirectory.Domain]::GetCurrentDomain() 
+    $allDC=$getdomain |ForEach-Object {$_.DomainControllers} |select -ExpandProperty Name
+    $ComputerName= $allDC
+
+    } 
+    Process 
+    { 
+        foreach ($Computer in $ComputerName) { 
+            Write-Verbose "Checking $Computer" 
+            try { 
+                $hostdns = [System.Net.DNS]::GetHostEntry($Computer)
+
+                $IPAddress = ([System.Net.Dns]::GetHostByName($Computer).AddressList[0]).IpAddressToString
+
+                $ComputerSystemInfo = Get-WmiObject -Class Win32_ComputerSystem -ComputerName $Computer -ErrorAction Stop -Credential $Credential 
+                $OS= Get-WmiObject -Class Win32_operatingsystem
+                switch ($ComputerSystemInfo.Model) { 
+                     
+                    # Check for Hyper-V Machine Type 
+                    "Virtual Machine" { 
+                        $MachineType="Hyper-v" 
+                        } 
+ 
+                    # Check for VMware Machine Type 
+                    "VMware Virtual Platform" { 
+                        $MachineType="VMWare" 
+                        } 
+ 
+                    # Check for Oracle VM Machine Type 
+                    "VirtualBox" { 
+                        $MachineType="VirtualBOx" 
+                        } 
+ 
+                    # Check for Xen 
+                    # I need the values for the Model for which to check. 
+ 
+                    # Check for KVM 
+                    # I need the values for the Model for which to check. 
+ 
+                    # Otherwise it is a physical Box 
+                    default { 
+                        $MachineType= $ComputerSystemInfo.Model 
+                        } 
+                    } 
+                 
+                     if($MachineType -eq "Hyper-v")
+                     {
+                            
+                            $key = 'SOFTWARE\Microsoft\Virtual Machine\Guest\Parameters'
+                            $valuename = 'HostName'
+                            $reg = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('LocalMachine', $computer)
+	                        $regkey = $reg.opensubkey($key)
+	                        $Global:Hypervisor=$regkey.getvalue($valuename)
+                            
+
+                             $MachineTypeInfo = New-Object -TypeName PSObject -Property ([ordered]@{ 
+                                    ComputerName=$ComputerSystemInfo.PSComputername
+                                    IP=$IPAddress
+                                    Type=$MachineType
+                                    Hypervisor=$Global:Hypervisor
+                                    OS= $os.caption
+                                    Manufacturer=$ComputerSystemInfo.Manufacturer 
+                                    Model=$ComputerSystemInfo.Model 
+                                    })
+
+                     }
+                     elseIf($MachineType -eq "VMWare")
+                     {
+
+
+                      $MachineTypeInfo = New-Object -TypeName PSObject -Property ([ordered]@{ 
+                                    ComputerName=$ComputerSystemInfo.PSComputername
+                                    IP=$IPAddress
+                                    Type=$MachineType
+                                    Hypervisor= "VMware"
+                                    OS= $os.caption
+                                    Manufacturer=$ComputerSystemInfo.Manufacturer 
+                                    Model=$ComputerSystemInfo.Model 
+                                    })
+
+                     }
+                     else
+                     {
+
+                                          
+                      $MachineTypeInfo = New-Object -TypeName PSObject -Property ([ordered]@{ 
+                                    ComputerName=$ComputerSystemInfo.PSComputername
+                                    IP=$IPAddress
+                                    Type=$MachineType
+                                    Hypervisor= ""
+                                    OS= $os.caption
+                                    Manufacturer=$ComputerSystemInfo.Manufacturer 
+                                    Model=$ComputerSystemInfo.Model 
+                                    })
+
+
+                     }
+
+
+              
+                $MachineTypeInfo |epcsv -Path C:\test\Systeminfo.csv -Append -NoTypeInformation
+                } 
+            catch [Exception] { 
+                Write-Output "$Computer`: $($_.Exception.Message)" 
+                } 
+            } 
+    } 
+    End 
+    { 
+ 
+    } 
+}
+
+Get-MachineType 

@@ -1,0 +1,179 @@
+﻿<#
+.Synopsis
+   Script will Run command on remote server and capture the Secedit.exe details.
+.DESCRIPTION
+   This script will capture the denylogon  user policy details from remoter computer.
+   and generate the output in CSV. and per server create individual file on localserver.
+   
+.EXAMPLE
+   ./Get-DenyLogOnLocallyPolicyRemotly.ps1
+.INPUTS
+   <ScriptLocation>\Server.txt Input file is require.
+.OUTPUTS
+   Output will be generated in CSV formate. 
+   <ScriptLocation>\Get-DenyLogOnLocallyPolicy.csv
+.COMPONENT
+   Need to Change Output path and Server.txt file path.
+.FUNCTIONALITY
+   Capturing DenyLogon policy from remoter computer.
+#>
+
+####################################################################################################
+#      
+#   Script Name: Get-DenyLogOnLocallyPolicyRemotly.ps1
+#
+#   Author:   Amar Vaidya/ Capgemini
+#   Version:  1.0
+#   Date:     12/05/2018
+#
+#   Revision history
+#	+--------+---------------+-------------------------+-------------------------------------+
+#   |1.01    |12/05/2018     | Amar Vaidya/Capgemini| Script get DenyLogonUser.         |
+#   +--------+---------------+-------------------------+-------------------------------------+
+####################################################################################################    
+
+
+
+
+
+
+
+#Veriable declaration 
+
+$global:ScriptName = $MyInvocation.MyCommand.Name
+$global:ScriptPath = split-path $SCRIPT:MyInvocation.MyCommand.Path -parent
+
+
+
+Function Get-IniContent
+{
+	
+	[CmdletBinding()]
+	Param (
+		[ValidateNotNullOrEmpty()]
+		[ValidateScript({ (Test-Path -LiteralPath $_) -and ((Get-Item -LiteralPath $_).Extension -eq ".ini") })]
+		[Parameter(ValueFromPipeline = $True, Mandatory = $True)]
+		[string]$FilePath
+	)
+	
+	Begin
+	{ Write-Verbose "$($MyInvocation.MyCommand.Name):: Function started" }
+	
+	Process
+	{
+		Write-Verbose "$($MyInvocation.MyCommand.Name):: Processing file: $Filepath"
+		
+		$ini = @{ }
+		$escapedFilePath = [Management.Automation.WildcardPattern]::Escape($FilePath)
+		$IniData = Get-Content $escapedFilePath
+		
+		switch -regex ($IniData)
+		{
+			"^\[(.+)\]$" # Section
+			{
+				$section = $matches[1]
+				$ini[$section] = @{ }
+				$CommentCount = 0
+			}
+			"^(;.*)$" # Comment
+			{
+				if (!($section))
+				{
+					$section = "No-Section"
+					$ini[$section] = @{ }
+				}
+				$value = $matches[1]
+				$CommentCount = $CommentCount + 1
+				$name = "Comment" + $CommentCount
+				$ini[$section][$name] = $value
+			}
+			"(.+?)\s*=\s*(.*)" # Key
+			{
+				if (!($section))
+				{
+					$section = "No-Section"
+					$ini[$section] = @{ }
+				}
+				$name, $value = $matches[1 .. 2]
+				$ini[$section][$name] = $value
+			}
+		}
+		Write-Verbose "$($MyInvocation.MyCommand.Name):: Finished Processing file: $FilePath"
+		Return $ini
+	}
+	
+	End
+	{ Write-Verbose "$($MyInvocation.MyCommand.Name):: Function ended" }
+} # End Function Get-IniContent
+
+
+Function Get-SecEditDataRemotely
+{
+$servers= Get-Content "$global:ScriptPath\servers.txt"
+
+    foreach($server in $servers)
+    {
+
+            try
+            {
+
+            $data=$null
+
+            $data=Invoke-Command -ComputerName $server -ScriptBlock {
+            $cmsd=$null
+            $cmsd=SecEdit /export /cfg C:\temp\CFI.ini
+            Get-Content C:\Temp\cfi.ini
+        
+            } -ErrorAction Stop
+
+            if(!(Test-Path "$global:ScriptPath\AllOutPut"))
+            {
+
+            $r=New-Item -Path "$global:ScriptPath\AllOutPut" -ItemType "directory"
+            $data |Out-File "$global:ScriptPath\AllOutPut\$server.ini"
+            Write-Host "$global:ScriptPath\AllOutPut\$server.ini File Created" -ForegroundColor Green
+            }
+            else
+            {
+            
+            $data |Out-File "$global:ScriptPath\AllOutPut\$server.ini"
+            Write-Host "$global:ScriptPath\AllOutPut\$server.ini File Created" -ForegroundColor Green
+            
+            }
+            
+            $IniFileContent = Get-IniContent "$global:ScriptPath\AllOutPut\$server.ini"
+
+            $global:LogonDenyUsers = $($IniFileContent["Privilege Rights"]["SeDenyInteractiveLogonRight"])
+            $global:BatchLogonRight = $($IniFileContent["Privilege Rights"]["SeDenyBatchLogonRight"])
+            $global:NetworkLogonRight = $($IniFileContent["Privilege Rights"]["SeDenyNetworkLogonRight"])
+            $global:RemoteInteractiveLogonRight = $($IniFileContent["Privilege Rights"]["SeDenyRemoteInteractiveLogonRight"])
+            
+            $Global:Resulthash =[ordered]@{             Server= $server
+                                                        Useraccount=$global:LogonDenyUsers
+                                                        BatchLogonRight=$global:BatchLogonRight
+                                                        NetworkLogonRight=$global:NetworkLogonRight
+                                                        RemoteInteractiveLogonRight=$global:RemoteInteractiveLogonRight
+                                                        }
+
+            $ResultObj =New-Object psobject -Property $Global:Resulthash
+
+
+            $ResultObj|Export-Csv "$global:ScriptPath\Get-DenyLogOnLocallyPolicy.csv" -Append -NoTypeInformation
+
+            
+            }
+            catch
+            {
+
+            Write-Host "Server $server is not reachable" -ForegroundColor Magenta
+
+            }
+
+
+    }
+
+    Write-Host "Output File Created at $global:ScriptPath\Get-DenyLogOnLocallyPolicy.csv" -ForegroundColor Green
+
+}
+
+Get-SecEditDataRemotely

@@ -1,0 +1,40 @@
+========================================================================================================================================
+
+#Load DLL file in memory
+$ExperimentalIOBinary = 'C:\Users\amavaidy\Desktop\Microsoft.Experimental.IO.dll'
+[System.Reflection.Assembly]::LoadFile($ExperimentalIOBinary)
+ 
+function DeleteAllFilesRecursive($path)
+{
+    "Getting folders in folder: " + $path
+    $subfolders = [Microsoft.Experimental.IO.LongPathDirectory]::EnumerateDirectories($path)
+    foreach ($subfolder in $subfolders)
+    {
+        "Recursing folder: " + $subfolder
+        DeleteAllFilesRecursive($subfolder)
+        "Deleting folder: " + $subfolder
+        [Microsoft.Experimental.IO.LongPathDirectory]::Delete($subfolder)
+    }
+ 
+    $files = [Microsoft.Experimental.IO.LongPathDirectory]::EnumerateFiles($path)
+    foreach ($file in $files)
+    {
+        "Deleting file: " + $file
+        [Microsoft.Experimental.IO.LongPathFile]::Delete($file)
+    }
+}
+ 
+
+
+==========================================Delete Specific file========================================================================
+
+$path ="C:\Users\amavaidy\AppData\Local\Microsoft\Windows\Temporary Internet Files"
+
+
+[Microsoft.Experimental.IO.LongPathDirectory]::Delete($path)
+
+
+
+$files = [Microsoft.Experimental.IO.LongPathDirectory]::EnumerateFiles($path) 
+
+$files |?{$_ -like "*.csv"}
