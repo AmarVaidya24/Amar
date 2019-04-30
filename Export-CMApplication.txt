@@ -1,0 +1,118 @@
+##Script written by Liam Matthews 2015
+
+##Variable list
+$computername=hostname
+$SCCMModule = ((Split-Path $env:SMS_ADMIN_UI_PATH) + "\ConfigurationManager.psd1")
+$SCCMSiteCode = (get-WMIObject -ComputerName "$computername" -Namespace "root\SMS" -Class "SMS_ProviderLocation").SiteCode
+$SCCMDrive = $SCCMSiteCode + “:”
+$SCCMServer = “localhost”
+$ExportPathDirect = “C:\Test\”
+
+##Progress bar
+Write-Progress -Activity “Application Export” -Status “Starting Script” -PercentComplete 10
+
+##Import SCCM PowerShell module
+Import-Module $SCCMModule
+
+##Connect to SCCM site
+CD $SCCMDrive
+
+##Pause to show previous display message
+Start-Sleep 5
+
+##Progress bar
+Write-Progress -Activity “Application Export” -Status “Searching for applications” -PercentComplete 30
+
+##Get applicaion list via WMI
+$Applications = Get-WMIObject -ComputerName $SCCMServer -Namespace Root\SMS\Site_$SCCMSiteCode -Class “SMS_Application” | Select -unique LocalizedDisplayName | sort LocalizedDisplayName
+
+##Application Import Selection Form
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+$form1 = New-Object System.Windows.Forms.Form
+$form1.Text = “Application Import”
+$form1.Size = New-Object System.Drawing.Size(425,380)
+$form1.StartPosition = “CenterScreen”
+
+$OKButton1 = New-Object System.Windows.Forms.Button
+$OKButton1.Location = New-Object System.Drawing.Point(300,325)
+$OKButton1.Size = New-Object System.Drawing.Size(75,23)
+$OKButton1.Text = “OK”
+$OKButton1.DialogResult = [System.Windows.Forms.DialogResult]::OK
+$OKButton1.Anchor = [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Right
+$form1.AcceptButton = $OKButton1
+$form1.Controls.Add($OKButton1)
+
+$CancelButton1 = New-Object System.Windows.Forms.Button
+$CancelButton1.Location = New-Object System.Drawing.Point(225,325)
+$CancelButton1.Size = New-Object System.Drawing.Size(75,23)
+$CancelButton1.Text = “Cancel”
+$CancelButton1.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+$CancelButton1.Anchor = [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Right
+$form1.CancelButton = $CancelButton1
+$form1.Controls.Add($CancelButton1)
+
+$label1 = New-Object System.Windows.Forms.Label
+$label1.Location = New-Object System.Drawing.Point(10,5)
+$label1.Size = New-Object System.Drawing.Size(280,20)
+$label1.Text = “Select an application to import”
+$form1.Controls.Add($label1)
+
+$listBox1 = New-Object System.Windows.Forms.Listbox
+$listBox1.Location = New-Object System.Drawing.Size(10,30)
+$listBox1.Width = 400
+$listBox1.Height = 296
+$listBox1.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Right
+
+##Add items to form
+foreach($Application in $Applications)
+{
+[void] $ListBox1.Items.Add($Application.LocalizedDisplayName)
+}
+
+$form1.Controls.Add($listBox1)
+$form1.Topmost = $True
+$result1 = $form1.ShowDialog()
+if ($result1 -eq [System.Windows.Forms.DialogResult]::OK)
+{
+$SelectedApplication = $listBox1.SelectedItems
+$SelectedApplication = $SelectedApplication[0]
+}
+else
+{
+exit
+}
+
+##Progress bar
+Write-Progress -Activity “Application Export” -Status “Exporting $SelectedApplication” -PercentComplete 60
+
+##Export selected application
+$ExportPath = $ExportPathDirect + $SelectedApplication + “.zip”
+Export-CMApplication -IgnoreRelated -Path $ExportPath -Name $SelectedApplication
+
+##Progress bar
+Write-Progress -Activity “Application Export” -Status “Finalizing” -PercentComplete 90
+
+##Rename exported folders to deployment type name
+$DeploymentTypes = Get-CMDeploymentType -ApplicationName $SelectedApplication
+foreach ($DeploymentType in $DeploymentTypes)
+{
+$OldContentName = $ExportPathDirect + $SelectedApplication + “_files\” + $DeploymentType.ContentId
+$NewContentName = $DeploymentType.LocalizedDisplayName
+$NewContentName = $NewContentName.Replace(“|”,””)
+$NewContentName = $NewContentName.Replace(“\”,””)
+$NewContentName = $NewContentName.Replace(“/”,””)
+$NewContentName = $NewContentName.Replace(“?”,””)
+$NewContentName = $NewContentName.Replace(“*”,””)
+$NewContentName = $NewContentName.Replace(“<“,””)
+$NewContentName = $NewContentName.Replace(“>”,””)
+Rename-Item -NewName $NewContentName -Path $OldContentName
+
+}
+
+##Progress bar
+Write-Progress -Activity “Application Export” -Status “Export of $SelectedApplication Completed” -PercentComplete 100
+
+##Pause to show previous display message
+Start-Sleep 5

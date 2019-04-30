@@ -1,4 +1,8 @@
 ﻿#Script written and modified by Adnan Amin
+#Blog: http://mstechtalk.com
+#twitter: @adnan_amin
+#facebook: https://www.facebook.com/groups/SharePoint.Pakistan/
+#facebook: https://www.facebook.com/MSTechTalk
 #The initial idea was taken from another technet gallery script by Salaudeen Rajack at https://gallery.technet.microsoft.com/office/SharePoint-Permission-2840f327
 #Script written by Salaudeen only genrate report for a single person, where as below script generates acceess permissions details for all users.
 

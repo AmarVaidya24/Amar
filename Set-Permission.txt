@@ -1,0 +1,93 @@
+<#
+
+.SYNOPSIS
+    This script Add Permision to Folder.
+
+.DESCRIPTION
+    This script Add Permision to Folder.
+
+.NOTES
+    Version			: 1.0
+    Date			: 24/07/2018
+    Author			: Amar Vaidya
+    Email			: Amar.vaidya@capgemini.com
+
+#>
+
+################################################################################################
+# Declarations
+################################################################################################
+$global:ScriptPath = split-path $SCRIPT:MyInvocation.MyCommand.Path -parent
+
+$status =$false
+ Try
+ {
+ 
+ Import-Module $ScriptPath\NTFSSecurity
+
+ }
+ catch
+ {
+ Write-Host "MOdule allready Present"
+ Log "Module Allready Installed" 
+ }
+
+Try
+{
+$Import =Import-Csv "$ScriptPath\permision.csv"
+$status =$true
+}
+Catch [System.IO.DirectoryNotFoundException],[System.IO.FileNotFoundException]
+{
+Log "Input File is Missing"
+$status =$false
+}
+#Store Log file Path
+$logfile = "$ScriptPath\set-Permission.log"
+
+################################################################################################
+# Functions
+################################################################################################
+
+# Log file functions
+function log($string, $color)
+{
+	
+	if ($color -eq $null) { $color = "white" }
+	
+	Write-Host $(Get-Date -format "dd-MMM-yyyy-HH-mm") $string -foregroundcolor $color
+	
+	$date = $(Get-Date -format "dd-MMM-yyyy HH:mm:ss")
+	
+	$string = $date + " " + $string
+	
+	$string | out-file -Filepath "$logfile" -append
+	
+}
+
+################################################################################################
+# Main Code
+################################################################################################
+
+IF($status -eq $true )
+{
+
+        foreach($imp in $Import)
+        {
+
+        #$ACL =$imp.Permission -replace " ",""
+        try
+        {
+        Add-NTFSAccess -Path $imp.FullName -Account $Imp.Account -AccessRights $imp.AccessRights -AccessType $imp.AccessControlType -InheritanceFlags $Imp.InheritanceFlags -PropagationFlags $imp.PropagationFlags
+
+        Log "$($imp.Account) Add to folder $($imp.FullName) With $ACL" "Green"
+        }
+        catch
+        {
+        Log "Unable to Set a Permision to FOlder $($Imp.FullName) to account $($imp.Account)" "Red"
+        }
+
+
+        }
+
+}

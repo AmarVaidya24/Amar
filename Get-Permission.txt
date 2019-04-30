@@ -1,0 +1,7 @@
+Import-Module C:\Test\NTFSSecurity
+
+
+
+Get-ChildItem C:\Scripts -Recurse -| Get-NTFSAccess |Select * |epcsv C:\Test\permision.csv -NoTypeInformation
+
+Get-NTFSAccess C:\Scripts |epcsv C:\Test\permision.csv -NoTypeInformation -Append
